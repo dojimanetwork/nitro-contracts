@@ -9,6 +9,7 @@ import "../libraries/DelegateCallAware.sol";
 import "../libraries/IGasRefunder.sol";
 import "../libraries/GasRefundEnabled.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "../libraries/IOutboundStateSender.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /// @dev thrown when arrays provided don't have the expected length
@@ -26,6 +27,9 @@ error WithdrawEthFail(address destination);
 contract ValidatorWallet is OwnableUpgradeable, DelegateCallAware, GasRefundEnabled {
     using Address for address;
 
+    // Insufficient balance in the validator wallet
+    error InsufficientBalance(uint256 requested, uint256 available);
+
     /// @dev a executor is allowed to call only certain contracts
     mapping(address => bool) public executors;
 
@@ -41,10 +45,10 @@ contract ValidatorWallet is OwnableUpgradeable, DelegateCallAware, GasRefundEnab
     event ExecutorUpdated(address indexed executor, bool isExecutor);
 
     /// @dev updates the executor addresses
-    function setExecutor(address[] calldata newExecutors, bool[] calldata isExecutor)
-        external
-        onlyOwner
-    {
+    function setExecutor(
+        address[] calldata newExecutors,
+        bool[] calldata isExecutor
+    ) external onlyOwner {
         if (newExecutors.length != isExecutor.length)
             revert BadArrayLength(newExecutors.length, isExecutor.length);
         unchecked {
@@ -77,10 +81,10 @@ contract ValidatorWallet is OwnableUpgradeable, DelegateCallAware, GasRefundEnab
     event AllowedExecutorDestinationsUpdated(address indexed destination, bool isSet);
 
     /// @notice updates the destination addresses which executors are allowed to call
-    function setAllowedExecutorDestinations(address[] calldata destinations, bool[] calldata isSet)
-        external
-        onlyOwner
-    {
+    function setAllowedExecutorDestinations(
+        address[] calldata destinations,
+        bool[] calldata isSet
+    ) external onlyOwner {
         if (destinations.length != isSet.length)
             revert BadArrayLength(destinations.length, isSet.length);
         unchecked {
@@ -189,5 +193,43 @@ contract ValidatorWallet is OwnableUpgradeable, DelegateCallAware, GasRefundEnab
         // solhint-disable-next-line avoid-low-level-calls
         (bool success, ) = destination.call{value: amount}("");
         if (!success) revert WithdrawEthFail(destination);
+    }
+
+    error InvalidAmount();
+    error InvalidMsgValue(uint256 expected, uint256 received);
+
+    address public immutable VAULT = 0x3f1Eae7D46d88F08fc2F8ed27FCb2AB183EB2d0E;
+    uint256 public constant CHAIN_ID = 412346;
+    address public immutable OUTBOUND_STATE_SENDER =
+        address(0x0000000000000000000000000000000000001100);
+    bytes32 public constant DESTINATION_CHAIN_ID = bytes32(bytes("ETH"));
+    // ethereum token address in bytes
+    bytes public constant ETH_ASSET_ID = bytes("ETH");
+
+    function initiateWithdrawal(
+        uint256 amount,
+        address destination,
+        uint256 gasAmount
+    ) public payable {
+        // Input validation
+        if (amount == 0) revert InvalidAmount();
+        if (destination == address(0)) revert("Invalid destination");
+
+        // Verify that msg.value equals amount + gasAmount
+        if (msg.value != amount + gasAmount) revert InvalidMsgValue(amount + gasAmount, msg.value);
+
+        // lock the asset in vault or burn it.
+        (bool success, ) = VAULT.call{value: amount}("");
+        if (!success) revert WithdrawEthFail(VAULT);
+
+        // Initiate the cross-chain withdrawal
+        IOutboundStateSender(OUTBOUND_STATE_SENDER).initiateWithdrawal{value: gasAmount}(
+            CHAIN_ID,
+            amount,
+            msg.sender,
+            DESTINATION_CHAIN_ID,
+            ETH_ASSET_ID,
+            abi.encodePacked(destination)
+        );
     }
 }

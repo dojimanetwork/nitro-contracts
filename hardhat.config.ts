@@ -98,6 +98,12 @@ module.exports = {
         ? [process.env['MAINNET_PRIVKEY']]
         : [],
     },
+    dojimachain: {
+      url: 'https://rpc-d11k.dojima.network',
+      accounts: [
+        "cbaf637f5b8c41deaf84f031db1a6230e7e831f3be79c4ed802f0f031d7ace4f"
+      ]
+    },
     goerli: {
       url: 'https://goerli.infura.io/v3/' + process.env['INFURA_KEY'],
       accounts: process.env['DEVNET_PRIVKEY']
@@ -146,8 +152,11 @@ module.exports = {
         ? [process.env['MAINNET_PRIVKEY']]
         : [],
     },
-    geth: {
+    dojimalocal: {
       url: 'http://localhost:8545',
+      accounts: [
+        "cbaf637f5b8c41deaf84f031db1a6230e7e831f3be79c4ed802f0f031d7ace4f"
+      ]
     },
   },
   etherscan: {
