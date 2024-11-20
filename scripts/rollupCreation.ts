@@ -41,6 +41,7 @@ interface RollupCreationResult {
   'upgrade-executor': string
   'validator-utils': string
   'validator-wallet-creator': string
+  'outbox': string
 }
 
 interface ChainInfo {
@@ -112,6 +113,8 @@ export async function createRollup(
           batchPosters: config.batchPosters,
           batchPosterManager: config.batchPosterManager,
         }
+
+    console.log("deployer params========= \n", deployParams )
 
     const createRollupTx = await rollupCreator.createRollup(deployParams, {
       value: feeCost,
@@ -198,6 +201,7 @@ export async function createRollup(
         'upgrade-executor': upgradeExecutor,
         'validator-utils': validatorUtils,
         'validator-wallet-creator': validatorWalletCreator,
+        "outbox": outbox
       }
 
       const chainInfo: ChainInfo = {
@@ -250,6 +254,7 @@ async function _getDevRollupConfig(
     validators.push(_createValidatorAddress(validatorWalletCreator, i))
   }
 
+  console.log("authorize validators", validators)
   // get chain config
   const childChainConfigPath =
     process.env.CHILD_CHAIN_CONFIG_PATH !== undefined
